@@ -14,6 +14,7 @@
 #include "iothubtransportmqtt.h"
 #include "iothub.h"
 #include "time.h"
+#include "filter.h"
 
 typedef struct MESSAGE_INSTANCE_TAG
 {
@@ -23,6 +24,10 @@ typedef struct MESSAGE_INSTANCE_TAG
 MESSAGE_INSTANCE;
 
 size_t messagesReceivedByInput1Queue = 0;
+
+int temperatureThreshold = 25;
+const char *HEART_BEAT = "heartbeat";
+
 
 // SendConfirmationCallback is invoked when the message that was forwarded on from 'InputQueue1Callback'
 // pipeline function is confirmed.
@@ -80,33 +85,94 @@ static IOTHUBMESSAGE_DISPOSITION_RESULT InputQueue1Callback(IOTHUB_MESSAGE_HANDL
     printf("Received Message [%zu]\r\n Data: [%s]\r\n", 
             messagesReceivedByInput1Queue, messageBody);
 
-    // This message should be sent to next stop in the pipeline, namely "output1".  What happens at "outpu1" is determined
-    // by the configuration of the Edge routing table setup.
-    MESSAGE_INSTANCE *messageInstance = CreateMessageInstance(message);
-    if (NULL == messageInstance)
-    {
-        result = IOTHUBMESSAGE_ABANDONED;
-    }
-    else
-    {
-        printf("Sending message (%zu) to the next stage in pipeline\n", messagesReceivedByInput1Queue);
+	IOTHUB_MESSAGE_HANDLE filteredMessage = FilterMessage(message, temperatureThreshold);
 
-        clientResult = IoTHubModuleClient_LL_SendEventToOutputAsync(iotHubModuleClientHandle, messageInstance->messageHandle, "output1", SendConfirmationCallback, (void *)messageInstance);
-        if (clientResult != IOTHUB_CLIENT_OK)
-        {
-            IoTHubMessage_Destroy(messageInstance->messageHandle);
-            free(messageInstance);
-            printf("IoTHubModuleClient_LL_SendEventToOutputAsync failed on sending msg#=%zu, err=%d\n", messagesReceivedByInput1Queue, clientResult);
-            result = IOTHUBMESSAGE_ABANDONED;
-        }
-        else
-        {
-            result = IOTHUBMESSAGE_ACCEPTED;
-        }
+	if (filteredMessage != NULL)
+	{
+		MESSAGE_INSTANCE *messageInstance = CreateMessageInstance(filteredMessage);
+
+		if (NULL == messageInstance)
+		{
+			result = IOTHUBMESSAGE_ABANDONED;
+		}
+		else
+		{
+			printf("Sending message (%zu) to the next stage in pipeline\n", messagesReceivedByInput1Queue);
+
+			clientResult = IoTHubModuleClient_LL_SendEventToOutputAsync(iotHubModuleClientHandle, messageInstance->messageHandle, "output1", SendConfirmationCallback, (void *)messageInstance);
+			if (clientResult != IOTHUB_CLIENT_OK)
+			{
+				IoTHubMessage_Destroy(messageInstance->messageHandle);
+				free(messageInstance);
+				printf("IoTHubModuleClient_LL_SendEventToOutputAsync failed on sending msg#=%zu, err=%d\n", messagesReceivedByInput1Queue, clientResult);
+				result = IOTHUBMESSAGE_ABANDONED;
+			}
+			else
+			{
+				result = IOTHUBMESSAGE_ACCEPTED;
+			}
+		}
     }
+	else
+	{
+		result = IOTHUBMESSAGE_ABANDONED;
+	}
 
     messagesReceivedByInput1Queue++;
     return result;
+}
+
+
+static void ModuleTwinCallback(DEVICE_TWIN_UPDATE_STATE update_state, const unsigned char* payLoad, size_t size, void* userContextCallback)
+{
+	JSON_Value *rootValue = json_parse_string(payLoad);
+	JSON_Object *rootObject = json_value_get_object(rootValue);
+
+	JSON_Object *desiredPropertyObject;
+	if (json_object_has_value_of_type(rootObject, "desired", JSONObject))
+	{
+		desiredPropertyObject = json_object_get_object(rootObject, "desired");
+	}
+	else
+	{
+		desiredPropertyObject = rootObject;
+	}
+
+	if (json_object_has_value_of_type(desiredPropertyObject, "TemperatureThreshold", JSONNumber)) 
+	{
+		double threshold = json_object_dotget_number(desiredPropertyObject, "TemperatureThreshold");
+		temperatureThreshold = threshold;
+	}
+}
+
+static int ModuleMethodCallback(const char* method_name, const unsigned char* payload, size_t size, unsigned char** response, size_t* response_size, void* userContextCallback)
+{
+	if (strcmp(HEART_BEAT, method_name) == 0) {
+		const char *messageStr = "Module [FilterModule] is Running";
+		IOTHUB_MESSAGE_HANDLE message = IoTHubMessage_CreateFromString(messageStr);
+		MESSAGE_INSTANCE *messageInstance = CreateMessageInstance(message);
+
+		IOTHUB_MODULE_CLIENT_LL_HANDLE iotHubModuleClientHandle = (IOTHUB_MODULE_CLIENT_LL_HANDLE)userContextCallback;
+		IOTHUB_CLIENT_RESULT clientResult = IoTHubModuleClient_LL_SendEventToOutputAsync(iotHubModuleClientHandle, messageInstance->messageHandle, HEART_BEAT, SendConfirmationCallback, (void *)messageInstance);
+		if (clientResult != IOTHUB_CLIENT_OK)
+		{
+			IoTHubMessage_Destroy(messageInstance->messageHandle);
+			free(messageInstance);
+			printf("IoTHubModuleClient_LL_SendEventToOutputAsync failed, err=%d\n", clientResult);
+			const char deviceMethodResponse[] = "{ }";
+			*response_size = sizeof(deviceMethodResponse) - 1;
+			*response = malloc(*response_size);
+			(void)memcpy(*response, deviceMethodResponse, *response_size);
+			return -1;
+		}
+	}
+
+	const char deviceMethodResponse[] = "{ \"Response\": \"Complete\" }";
+	*response_size = sizeof(deviceMethodResponse) - 1;
+	*response = malloc(*response_size);
+	(void)memcpy(*response, deviceMethodResponse, *response_size);
+
+	return 200;
 }
 
 static IOTHUB_MODULE_CLIENT_LL_HANDLE InitializeConnection()
@@ -154,6 +220,9 @@ static int SetupCallbacksForModule(IOTHUB_MODULE_CLIENT_LL_HANDLE iotHubModuleCl
     {
         ret = 0;
     }
+
+	IoTHubModuleClient_LL_SetModuleTwinCallback(iotHubModuleClientHandle, ModuleTwinCallback, NULL);
+	IoTHubModuleClient_LL_SetModuleMethodCallback(iotHubModuleClientHandle, ModuleMethodCallback, (void*)iotHubModuleClientHandle);
 
     return ret;
 }

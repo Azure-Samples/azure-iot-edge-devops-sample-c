@@ -23,9 +23,20 @@ include_directories(${AZUREIOT_INC_FOLDER})
 
 set(main_c_files
     ./main.c
+    ./filter.c
+    ./filter.h
+)
+
+set(test_files
+    ./tests.c
+    ./filter.c
+    ./filter.h
+    ./parson.h
+    ./parson.c
 )
 
 add_executable(main ${main_c_files})
+add_executable(unittest ${test_files})
 
 target_link_libraries(main
     iothub_client_mqtt_transport
@@ -43,3 +54,24 @@ target_link_libraries(main
     m
     uuid
 )
+
+target_link_libraries(unittest
+    iothub_client_mqtt_transport
+    iothub_client
+    parson
+    tap
+    umqtt
+    prov_auth_client
+    hsm_security_client
+    uhttp
+    aziotsharedutil
+    pthread
+    curl
+    ssl
+    crypto
+    m
+    uuid
+)
+
+enable_testing()
+add_test (NAME UnitTest COMMAND unittest)

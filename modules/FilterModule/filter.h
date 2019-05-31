@@ -11,3 +11,6 @@
 #include "iothubtransportmqtt.h"
 #include "iothub.h"
 #include "time.h"
+#include "parson.h"
+
+IOTHUB_MESSAGE_HANDLE FilterMessage(IOTHUB_MESSAGE_HANDLE message, int threshold);
