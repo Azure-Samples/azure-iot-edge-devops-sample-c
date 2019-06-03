@@ -9,8 +9,11 @@ RUN apt-get update && \
 FROM base AS build-env
 RUN apt-get update && \
     apt-get install -y --no-install-recommends cmake gcc g++ make && \
+    apt-get install -y --no-install-recommends git-core &&\
     rm -rf /var/lib/apt/lists/* 
+
 WORKDIR /app
+RUN git clone https://github.com/kgabis/parson.git && cd parson && mv parson.c parson.h .. && cd .. && rm -rf parson
 COPY . ./
 RUN cmake . 
 RUN make
