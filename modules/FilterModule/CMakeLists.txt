@@ -23,56 +23,61 @@ set(AZUREIOT_INC_FOLDER_EXTRA "/usr/local/include/azureiot" "/usr/local/include/
 include_directories(${AZUREIOT_INC_FOLDER})
 include_directories(${AZUREIOT_INC_FOLDER_EXTRA})
 
-set(main_c_files
-    ./main.c
-    ./filter.c
-    ./filter.h
-)
+if (RUN_TEST_ONLY)
+  set(test_files
+      ./tests.c
+      ./filter.c
+      ./filter.h
+      ./parson.h
+      ./parson.c
+  )
 
-set(test_files
-    ./tests.c
-    ./filter.c
-    ./filter.h
-    ./parson.h
-    ./parson.c
-)
+  add_executable(unittest ${test_files})
+  target_link_libraries(unittest
+      iothub_client_mqtt_transport
+      iothub_client
+      parson
+      tap
+      umqtt
+      uhttp
+      aziotsharedutil
+      pthread
+      curl
+      ssl
+      crypto
+      m
+      uuid
+  )
+  enable_testing()
+  add_test (NAME UnitTest COMMAND unittest)
+else()
+  set(main_c_files
+      ./main.c
+      ./filter.c
+      ./filter.h
+  )
 
-#add_executable(main ${main_c_files})
-add_executable(unittest ${test_files})
-#[[
-target_link_libraries(main
-    iothub_client_mqtt_transport
-    iothub_client
-    parson
-    umqtt
-    prov_auth_client
-    hsm_security_client
-    uhttp
-    aziotsharedutil
-    pthread
-    curl
-    ssl
-    crypto
-    m
-    uuid
-)
-]]
+  add_executable(main ${main_c_files})
 
-target_link_libraries(unittest
-    iothub_client_mqtt_transport
-    iothub_client
-    parson
-    tap
-    umqtt
-    uhttp
-    aziotsharedutil
-    pthread
-    curl
-    ssl
-    crypto
-    m
-    uuid
-)
+  target_link_libraries(main
+      iothub_client_mqtt_transport
+      iothub_client
+      parson
+      umqtt
+      prov_auth_client
+      hsm_security_client
+      uhttp
+      aziotsharedutil
+      pthread
+      curl
+      ssl
+      crypto
+      m
+      uuid
+  )
+endif()
 
-enable_testing()
-add_test (NAME UnitTest COMMAND unittest)
+
+
+
+
