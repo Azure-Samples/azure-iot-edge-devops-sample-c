@@ -37,9 +37,9 @@ set(test_files
     ./parson.c
 )
 
-add_executable(main ${main_c_files})
+#add_executable(main ${main_c_files})
 add_executable(unittest ${test_files})
-
+#[[
 target_link_libraries(main
     iothub_client_mqtt_transport
     iothub_client
@@ -56,6 +56,7 @@ target_link_libraries(main
     m
     uuid
 )
+]]
 
 target_link_libraries(unittest
     iothub_client_mqtt_transport
@@ -63,8 +64,6 @@ target_link_libraries(unittest
     parson
     tap
     umqtt
-    prov_auth_client
-    hsm_security_client
     uhttp
     aziotsharedutil
     pthread
