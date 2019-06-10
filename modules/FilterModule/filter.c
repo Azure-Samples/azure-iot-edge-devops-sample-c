@@ -47,7 +47,7 @@ IOTHUB_MESSAGE_HANDLE FilterMessage(IOTHUB_MESSAGE_HANDLE message, int threshold
             }
             else
             {
-                IoTHubMessage_SetContentTypeSystemProperty(filtered_message, "application/json");
+                IoTHubMessage_SetContentTypeSystemProperty(filtered_message, "application%2Fjson");
             }
 
             if (originContentEncoding != NULL)
