@@ -1,0 +1,22 @@
+FROM ubuntu:xenial AS base
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends software-properties-common && \
+    add-apt-repository -y ppa:aziotsdklinux/ppa-azureiot && \
+    apt-get update && \
+    apt-get install -y azure-iot-sdk-c-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+FROM base AS build-env
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends cmake gcc g++ make && \
+    apt-get install -y --no-install-recommends git-core &&\
+    rm -rf /var/lib/apt/lists/* 
+
+WORKDIR /app
+COPY . ./
+RUN git clone https://github.com/zorgnax/libtap.git && cd libtap && make && make check &&  PREFIX=/usr  make install && cd .. && rm -rf  libtap
+RUN git clone https://github.com/kgabis/parson.git && cd parson && mv parson.c parson.h .. && cd .. && rm -rf parson
+
+RUN cmake -DRUN_TEST_ONLY=1 .
+RUN make
+RUN ./unittest
