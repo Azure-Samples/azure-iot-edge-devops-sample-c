@@ -5,7 +5,7 @@
 inputs=$#
 iothub_name=$1
 device_tag_value=$2
-deployment_name=$3
+deployment_name=${3,,}
 
 shift 3
 
