@@ -96,19 +96,19 @@ validateDevicesConnectedToIoTHub(){
 echo "Validating devices where $device_tag = $device_tag_value are currently connected to the iot hub..."
 for device in ${devices[*]}
 do
-        connectionStatus=unknown
+        pingStatus=unknown
 		for ((i=1;i<=numberOfRetries;i++)); 
 		do
-			if [[ $connectionStatus != "Connected" ]]
+			if [[ $pingStatus != "200" ]]
 			then
-					connectionStatus=($(az iot hub module-twin show --module-id '$edgeAgent' --hub-name $iothub_name --device-id $device --query 'connectionState' -o tsv))
-					echo 'device' $device 'connection status: ' $connectionStatus
+					pingStatus=($(az iot hub invoke-module-method --method-name 'ping' --module-id '$edgeAgent' --hub-name $iothub_name --device-id $device --query 'status' -o tsv))
+					echo 'device' $device 'ping status: ' $pingStatus
 					sleep $delayInSeconds
 			fi
 		done
-    if [[ $connectionStatus != "Connected" ]]
+    if [[ $pingStatus != "200" ]]
     then 
-        echo $device 'is not connected with status' $connectionStatus 'exiting.' 1>&2; exit 1;
+        echo $device 'is not connected with ping status' $pingStatus 'exiting.' 1>&2; exit 1;
     fi
 done
 }
